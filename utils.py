@@ -1,178 +1,159 @@
-# pages/A_CDMO_Drilldown.py
-
-import streamlit as st
+# utils.py
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from utils import generate_cdmo_data, generate_master_schedule, generate_spc_data, generate_quality_data, generate_risk_register
-from datetime import date
+import numpy as np
+# REMOVED plotly imports as they are not used directly in this file
+from datetime import date, timedelta
 
-st.set_page_config(page_title="CDMO Drilldown | Avidity", layout="wide")
+# --- START: FIX ---
+# The line "from utils import ..." has been completely removed.
+# All other functions remain the same.
+# --- END: FIX ---
 
-# --- Data Loading ---
-cdmo_df = generate_cdmo_data()
-schedule_df = generate_master_schedule()
-quality_df = generate_quality_data()
-risk_df = generate_risk_register()
+def generate_cdmo_data():
+    """Generates a list of mock CDMO partners with enriched performance and BCP metrics."""
+    data = {
+        'CDMO Name': ['Catalent Pharma', 'WuXi Biologics', 'Lonza Group', 'Fujifilm Diosynth'],
+        'Location': ['Bloomington, IN, USA', 'Dundalk, Ireland', 'Visp, Switzerland', 'Hillerød, Denmark'],
+        'Status': ['Active', 'Active', 'Onboarding', 'Active'],
+        'Expertise': ['Antibody Production', 'Oligonucleotide Synthesis', 'AOC Conjugation & Fill-Finish', 'Antibody Production'],
+        'Avg. On-Time Delivery (%)': [98, 85, 99, 92],
+        'Avg. Batch Success Rate (%)': [95, 100, 100, 98],
+        'Quality Score (1-100)': [88, 95, 99, 92],
+        'Avg. Yield (%)': [82, 88, 85, 84],
+        'Batches YTD': [12, 25, 4, 15],
+        'BCP Status': ['Approved', 'Under Review', 'Draft', 'Approved'],
+        'BCP Last Reviewed': [date(2023, 12, 1), date(2024, 6, 5), None, date(2024, 1, 15)]
+    }
+    return pd.DataFrame(data)
 
-st.sidebar.title("CDMO Selection")
-selected_cdmo = st.sidebar.selectbox("Select a CDMO to view details", cdmo_df['CDMO Name'])
+def generate_master_schedule():
+    """Generates a master production schedule with enriched technical details."""
+    today = date.today()
+    data = {
+        'Batch ID': ['AVC-DM1-P3-B005', 'AVC-DM1-P3-B006', 'AVC-DMD-P2-B003', 'AVC-FSHD-P2-B002', 'AVC-DMD-P2-B004', 'AVC-DM1-P3-B007'],
+        'Product': ['AOC-1001', 'AOC-1001', 'AOC-1021', 'AOC-1044', 'AOC-1021', 'AOC-1001'],
+        'Program': ['DM1', 'DM1', 'DMD', 'FSHD', 'DMD', 'DM1'],
+        'CDMO': ['WuXi Biologics', 'Catalent Pharma', 'Fujifilm Diosynth', 'WuXi Biologics', 'Lonza Group', 'Catalent Pharma'],
+        'Status': ['In Production', 'At Risk', 'Awaiting Release', 'Shipped', 'Planned', 'Failed'],
+        'Start Date': [today - timedelta(days=30), today - timedelta(days=20), today - timedelta(days=60), today - timedelta(days=90), today + timedelta(days=10), today - timedelta(days=45)],
+        'End Date': [today + timedelta(days=60), today + timedelta(days=45), today - timedelta(days=10), today - timedelta(days=30), today + timedelta(days=90), today - timedelta(days=15)],
+        'Planned Cycle Time (Days)': [90, 65, 50, 60, 80, 30],
+        'Actual Cycle Time (Days)': [92, 68, 51, 60, np.nan, 30],
+        'Yield (%)': [88.1, np.nan, 84.5, 90.2, np.nan, 45.0],
+        'Deviation ID': [None, 'DEV-24-015', None, None, None, 'DEV-24-018']
+    }
+    return pd.DataFrame(data)
 
-st.title(f"Technical Drilldown: {selected_cdmo}")
-cdmo_details = cdmo_df[cdmo_df['CDMO Name'] == selected_cdmo].iloc[0]
-st.markdown(f"**Location:** {cdmo_details['Location']} | **Expertise:** {cdmo_details['Expertise']}")
-st.divider()
+def generate_risk_register():
+    """Generates an enhanced risk register."""
+    data = {
+        'Risk ID': ['RSK-SUP-01', 'RSK-TECH-01', 'RSK-COMP-01', 'RSK-GEO-01'],
+        'CDMO': ['WuXi Biologics', 'Lonza Group', 'All', 'Catalent Pharma'],
+        'Description': ['Single-source for critical raw material faces shipping delays.', 'New conjugation process shows yield variability at scale.', 'Upcoming EMA inspection may scrutinize data integrity of batch records.', 'Geopolitical tensions could impact shipping lanes from US facility.'],
+        'Impact': [4, 4, 5, 3], 'Probability': [3, 4, 2, 2], 'Owner': ['Supply Chain', 'Tech Dev', 'Quality', 'Manager'],
+        'Mitigation Strategy': ['Qualify second supplier (Project OpEx-003).', 'Perform DOE to optimize process parameters.', 'Conduct internal audit and data review ahead of inspection.', 'Increase safety stock at domestic warehouse.'],
+        'Mitigation Status': ['In Progress', 'Planned', 'In Progress', 'Complete']
+    }
+    df = pd.DataFrame(data)
+    df['Risk Score'] = df['Impact'] * df['Probability']
+    return df.sort_values(by='Risk Score', ascending=False)
 
-cdmo_schedule = schedule_df[schedule_df['CDMO'] == selected_cdmo]
-cdmo_risks = risk_df[risk_df['CDMO'].isin([selected_cdmo, 'All'])]
-cdmo_quality = quality_df[quality_df['CDMO'] == selected_cdmo]
-
-tab1, tab2, tab3, tab4 = st.tabs(["🔬 Batch Deep Dive", "📈 Process Capability", "📋 Quality Systems", "🛡️ Continuity & Mitigation"])
-
-with tab1:
-    st.header("Batch Deep Dive Analysis")
-    st.caption("Perform a detailed analysis of any specific manufacturing batch, including its SPC data and final disposition.")
-    selected_batch = st.selectbox("Select a Batch ID for detailed analysis", cdmo_schedule['Batch ID'])
+def generate_spc_data(batch_id, parameter='Oligo Concentration'):
+    """Generates detailed SPC data for a batch process step."""
+    np.random.seed(hash(batch_id) % (2**32 - 1))
+    n_points = 20
+    mean = 10.0 if parameter == 'Oligo Concentration' else 7.2
+    std_dev = 0.2 if parameter == 'Oligo Concentration' else 0.05
+    lsl = 9.5 if parameter == 'Oligo Concentration' else 7.0
+    usl = 10.5 if parameter == 'Oligo Concentration' else 7.4
     
-    if selected_batch:
-        batch_details = cdmo_schedule[cdmo_schedule['Batch ID'] == selected_batch].iloc[0]
-        spc_data = generate_spc_data(selected_batch)
-
-        status = batch_details['Status']
-        if status == 'Failed':
-            st.error(f"**Batch Disposition: FAILED** | Deviation: {batch_details['Deviation ID']}")
-        elif status == 'At Risk':
-            st.warning(f"**Batch Disposition: AT RISK** | Deviation: {batch_details['Deviation ID']}")
-        else:
-            st.success("**Batch Disposition: PASSED**")
-        st.divider()
-
-        st.subheader(f"Statistical Process Control (SPC) for: {selected_batch}")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=spc_data['Measurement'], y=spc_data['Value'], mode='lines+markers', name='Value', line=dict(color='#003F87')))
-        fig.add_trace(go.Scatter(x=spc_data['Measurement'], y=spc_data['Mean'], mode='lines', name='Mean', line=dict(color='green', dash='dash')))
-        fig.add_trace(go.Scatter(x=spc_data['Measurement'], y=spc_data['UCL'], mode='lines', name='Control Limit', line=dict(color='orange', dash='dash')))
-        fig.add_trace(go.Scatter(x=spc_data['Measurement'], y=spc_data['LCL'], mode='lines', showlegend=False, line=dict(color='orange', dash='dash')))
-        fig.add_trace(go.Scatter(x=spc_data['Measurement'], y=spc_data['USL'], mode='lines', name='Spec Limit', line=dict(color='red')))
-        fig.add_trace(go.Scatter(x=spc_data['Measurement'], y=spc_data['LSL'], mode='lines', showlegend=False, line=dict(color='red')))
-        
-        oos = spc_data[(spc_data['Value'] > spc_data['USL']) | (spc_data['Value'] < spc_data['LSL'])]
-        if not oos.empty:
-            fig.add_trace(go.Scatter(x=oos['Measurement'], y=oos['Value'], mode='markers', marker=dict(color='red', size=12, symbol='x'), name='Out of Spec'))
-        
-        fig.update_layout(title_text="Control Chart for Oligo Concentration", yaxis_title="Concentration (mg/mL)", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig, use_container_width=True)
-
-        with st.expander("Methodology & Actionability: SPC Chart"):
-            st.markdown("""
-            **Methodology:** Statistical Process Control (SPC) distinguishes between inherent "common cause" variation and unexpected "special cause" variation. This chart plots a Critical Process Parameter (CPP) over time for a single batch.
-
-            **The Math:**
-            - **Spec Limits (USL/LSL - Red Lines):** Pre-defined quality requirements (the "Voice of the Customer"). They are not calculated from this data.
-            - **Control Limits (UCL/LCL - Orange Dashed Lines):** The "Voice of the Process," calculated as `Mean ± 3 * Standard_Deviation`. A point outside these limits is statistically rare (p < 0.003).
-
-            **Significance & Insights:**
-            - **Point outside Spec Limits:** The batch has **failed** to meet a critical quality requirement.
-            - **Point outside Control Limits:** The process is **unstable**. An unexpected event occurred, requiring investigation even if the batch is still in spec.
-            - **Non-random Patterns (e.g., 7 points trending down):** The process is **drifting out of control**, a leading indicator of future failure.
-
-            **Managerial Actionability:**
-            - **Action:** A point out-of-spec triggers a formal **Deviation**.
-            - **Action:** A point out-of-control requires a **technical deep-dive** with the CDMO to identify the "special cause" and prevent recurrence.
-            """)
-
-with tab2:
-    st.header("Process Capability & Performance")
-    st.caption("Evaluate long-term process stability and capability across multiple batches.")
+    data = np.random.normal(mean, std_dev, n_points)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Cycle Time Performance (XmR Chart)")
-        completed_batches = cdmo_schedule.dropna(subset=['Actual Cycle Time (Days)'])
-        if not completed_batches.empty and len(completed_batches) > 1:
-            mean_ct = completed_batches['Actual Cycle Time (Days)'].mean()
-            mr = completed_batches['Actual Cycle Time (Days)'].diff().abs()
-            ucl = mean_ct + 2.66 * mr.mean()
-            lcl = mean_ct - 2.66 * mr.mean()
-            
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=completed_batches['Batch ID'], y=completed_batches['Actual Cycle Time (Days)'], mode='lines+markers', name='Cycle Time'))
-            fig.add_hline(y=mean_ct, line_dash="dash", line_color="green", annotation_text=f"Mean: {mean_ct:.1f}d")
-            fig.add_hline(y=ucl, line_dash="dash", line_color="red", annotation_text="UCL")
-            fig.add_hline(y=lcl, line_dash="dash", line_color="red", annotation_text="LCL")
-            fig.update_layout(height=400, title="Process Stability: Batch Cycle Times", yaxis_title="Days", margin=dict(t=40, b=20))
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("At least two completed batches are needed to calculate control limits.")
+    if batch_id == 'AVC-DM1-P3-B006': # At Risk batch
+        data[15:] -= np.linspace(0, 0.4, 5) # Introduce a downward trend
+    if batch_id == 'AVC-DM1-P3-B007': # Failed batch
+        data[10:] = np.random.normal(mean - 0.5, std_dev*1.5, 10) # Introduce a shift
+        data[18] = lsl - 0.1 # OOS point
 
-    with col2:
-        st.subheader("Process Capability (Cpk)")
-        cpk_data = {'Parameter': ['Oligo Concentration', 'pH', 'Antibody Titer', 'Conjugation Efficiency'],'Cpk Value': [1.45, 1.82, 0.95, 1.10]}
-        cpk_df = pd.DataFrame(cpk_data)
-        fig = px.bar(cpk_df, x='Cpk Value', y='Parameter', orientation='h', title='Process Capability for Critical Parameters', text='Cpk Value')
-        fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
-        fig.add_vline(x=1.33, line_dash="dash", line_color="green", annotation_text="Target Cpk")
-        fig.add_vline(x=1.0, line_dash="dash", line_color="red", annotation_text="Incapable")
-        st.plotly_chart(fig, use_container_width=True)
+    df = pd.DataFrame({'Measurement': range(1, n_points + 1), 'Value': data})
+    df['Mean'] = mean
+    df['UCL'] = mean + 3 * std_dev
+    df['LCL'] = mean - 3 * std_dev
+    df['USL'] = usl
+    df['LSL'] = lsl
+    return df
+
+def generate_quality_data():
+    """Generates data for the quality and compliance dashboard."""
+    data = {
+        'Record ID': ['DEV-24-015', 'CAPA-23-008', 'CR-24-031', 'DEV-24-018'],
+        'CDMO': ['Catalent Pharma', 'WuXi Biologics', 'Fujifilm Diosynth', 'Catalent Pharma'],
+        'Type': ['Deviation', 'CAPA', 'Change Request', 'Deviation'],
+        'Description': ['Temperature excursion during upstream process step.', 'Implement new training for analytical method transfer.', 'Update master batch record with new stirring parameters.', 'Contamination event led to batch failure.'],
+        'Status': ['Investigation', 'Effectiveness Check', 'Pending Approval', 'Root Cause Analysis'],
+        'Priority': ['High', 'Medium', 'Low', 'Critical'],
+        'Days Open': [15, 92, 5, 2]
+    }
+    return pd.DataFrame(data)
+
+def generate_budget_data():
+    """Generates hierarchical budget data."""
+    data = {
+        'Category': ['External Manufacturing', 'External Manufacturing', 'External Manufacturing', 'External Manufacturing', 'Supporting Activities', 'Supporting Activities'],
+        'Sub-Category': ['Drug Substance', 'Drug Substance', 'Drug Product', 'Drug Product', 'Logistics', 'Consulting'],
+        'CDMO': ['Catalent Pharma', 'Fujifilm Diosynth', 'Lonza Group', 'WuXi Biologics', 'Global', 'Global'],
+        'Program': ['DM1', 'DMD', 'DMD/FSHD', 'DM1', 'All', 'All'],
+        'Annual Budget ($M)': [15.0, 12.0, 10.0, 25.0, 3.0, 2.0],
+        'YTD Actuals ($M)': [10.2, 8.0, 3.1, 18.5, 1.5, 1.8],
+        'YTD Forecast ($M)': [11.0, 7.5, 4.0, 19.0, 1.8, 2.0]
+    }
+    return pd.DataFrame(data)
+
+def generate_tech_transfer_data():
+    """Generates structured data for a tech transfer project with risk and progress."""
+    data = {
+        'Task ID': ['TT-1.1', 'TT-1.2', 'TT-2.1', 'TT-3.1', 'TT-3.2', 'TT-4.1', 'TT-5.1'],
+        'Task': ['Define Scope & Assemble VPT', 'Approve Tech Transfer Plan', 'Transfer Process & Analytical Methods', 'Complete Facility Fit & Gap Analysis', 'Qualify Raw Materials', 'Execute Engineering Batch', 'Execute 3x PPQ Batches'],
+        'Lead Team': ['Ops', 'QA', 'Tech Dev', 'Engineering', 'Supply Chain', 'CDMO/Ops', 'CDMO/Ops'],
+        'Planned Duration (Days)': [10, 5, 45, 20, 30, 15, 60],
+        'Actual Duration (Days)': [10, 6, 50, 22, np.nan, np.nan, np.nan],
+        'Start Date': pd.to_datetime(['2024-04-01', '2024-04-11', '2024-04-16', '2024-06-05', '2024-06-05', '2024-07-08', '2024-07-23']),
+        'Risk Level': ['Low', 'Low', 'High', 'Medium', 'High', 'Medium', 'High'],
+        'Progress (%)': [100, 100, 100, 100, 75, 20, 0]
+    }
+    df = pd.DataFrame(data)
+    df['Finish Date'] = df['Start Date'] + pd.to_timedelta(df['Planned Duration (Days)'], unit='D')
+    return df
+
+def generate_governance_data():
+    """Generates enriched data for governance meetings."""
+    data = {
+        'Date': [date(2024, 2, 20), date(2024, 4, 15), date(2024, 5, 20)],
+        'CDMO': ['WuXi Biologics', 'Catalent Pharma', 'WuXi Biologics'],
+        'Meeting Type': ['Quarterly Business Review', 'Technical Working Group', 'Quarterly Business Review'],
+        'Key Topics': ['Review Q4 KPIs, discuss 2024 forecast.', 'Investigate yield drop in B004.', 'Review Q1 KPIs, address DEV-24-015.'],
+        'Actions Generated': [5, 2, 3],
+        'Actions Closed': [5, 1, 1]
+    }
+    return pd.DataFrame(data)
     
-    with st.expander("Methodology & Actionability: Cpk & XmR Charts"):
-        st.markdown("""
-        **Methodology:**
-        - **XmR Chart:** An SPC chart for tracking process stability *between* batches.
-        - **Cpk (Process Capability Index):** A standard industry metric that quantifies how well a stable process can meet its specification limits.
-
-        **The Math:**
-        - **Cpk = min( (USL - μ) / 3σ , (μ - LSL) / 3σ )**. It measures how many "sigmas" (`σ`) fit between your process mean (`μ`) and the nearest specification limit (USL/LSL).
-
-        **Significance & Insights:**
-        - **Cpk < 1.0:** The process is **not capable** and is guaranteed to produce defects. This is a major problem.
-        - **1.0 ≤ Cpk < 1.33:** The process is **marginally capable** and requires tight control.
-        - **Cpk ≥ 1.33:** The process is considered **capable** and robust. This is the common industry target.
-
-        **Managerial Actionability:**
-        - **Action:** Any parameter with a Cpk below 1.33 is a prime candidate for a **continuous improvement project** (tracked on the OpEx page).
-        - **Action:** Use this data to justify allocating resources from Technical Development to improve a specific, incapable process step.
-        """)
-
-with tab3:
-    st.header("Quality Systems Tracker")
-    st.caption(f"Open deviations, CAPAs, and change requests for {selected_cdmo}. Prioritize by age and priority.")
-    if not cdmo_quality.empty:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("Open Records by Type")
-            q_counts = cdmo_quality['Type'].value_counts()
-            fig = px.bar(q_counts, x=q_counts.index, y=q_counts.values, title="Count of Open Quality Records", labels={'x':'Record Type', 'y':'Count'})
-            st.plotly_chart(fig, use_container_width=True)
-        with col2:
-            st.subheader("Record Aging")
-            fig = px.bar(cdmo_quality, x='Record ID', y='Days Open', color='Priority', title="Aging of Open Records", color_discrete_map={'Critical':'maroon', 'High':'red', 'Medium':'orange', 'Low':'grey'})
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.success("No open quality records for this CDMO.")
-            
-    with st.expander("View/Edit Detailed Quality Log"):
-        if not cdmo_quality.empty:
-            st.data_editor(cdmo_quality, use_container_width=True, hide_index=True)
-
-with tab4:
-    st.header("Business Continuity & Risk Mitigation")
-    st.subheader("Business Continuity Plan (BCP)")
-    bcp_status = cdmo_details['BCP Status']
-    bcp_last_reviewed = cdmo_details['BCP Last Reviewed']
-    bcp_col1, bcp_col2 = st.columns(2)
-    bcp_col1.metric("BCP Status", bcp_status)
-    if pd.notna(bcp_last_reviewed):
-        bcp_col2.metric("BCP Last Reviewed", bcp_last_reviewed.strftime('%Y-%m-%d'))
-        if (date.today() - bcp_last_reviewed).days > 365:
-            st.warning("BCP review is overdue. Schedule a review with the CDMO.")
-    else:
-        bcp_col2.metric("BCP Last Reviewed", "N/A")
-    st.divider()
-
-    st.subheader("Interactive Risk Mitigation Register")
-    st.caption("This register tracks all identified risks and their corresponding mitigation plans. Use it to drive risk reduction activities with the VPT.")
-    if cdmo_risks.empty:
+def generate_op_ex_data():
+    """Generates a portfolio of continuous improvement projects."""
+    data = {
+        'Project ID': ['OpEx-001', 'OpEx-002', 'OpEx-003', 'OpEx-004'],
+        'Title': ['Improve Conjugation Yield', 'Reduce Cycle Time for Antibody Prod.', 'Qualify 2nd Supplier for Oligo', 'Automate Deviation Trending'],
+        'Lead': ['Tech Dev', 'Manager', 'Supply Chain', 'Quality'],
+        'CDMO': ['Lonza Group', 'Catalent Pharma', 'WuXi Biologics', 'All'],
+        'Status': ['In Progress', 'Complete', 'In Progress', 'Planned'],
+        'Start Date': [date(2024, 6, 1), date(2024, 1, 15), date(2024, 5, 1), date(2024, 8, 1)],
+        'Target Completion': [date(2024, 12, 1), date(2024, 4, 30), date(2025, 2, 1), date(2024, 11, 30)],
+        'Financial Impact ($K/yr)': [500, 250, 1500, 50],
+        'Technical Feasibility (1-5)': [3, 5, 4, 5],
+        'Implementation Cost ($K)': [75, 20, 300, 40]
+    }
+    df = pd.DataFrame(data)
+    df['ROI'] = df['Financial Impact ($K/yr)'] / df['Implementation Cost ($K)']
+    return df
         st.success(f"No specific risks currently logged for {selected_cdmo}.")
     else:
         st.data_editor(cdmo_risks, column_config={"Mitigation Status": st.column_config.SelectboxColumn("Status", options=['Planned', 'In Progress', 'Complete', 'On Hold'], required=True), "Risk Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=25, format="%d")}, use_container_width=True, hide_index=True)
