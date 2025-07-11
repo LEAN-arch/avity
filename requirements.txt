@@ -11,3 +11,4 @@ numpy
 
 # Advanced plotting and visualization
 plotly
+statsmodels
