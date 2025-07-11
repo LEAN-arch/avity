@@ -1,0 +1,13 @@
+# requirements.txt
+
+# Core framework for building the web application
+streamlit
+
+# Data manipulation and analysis
+pandas
+
+# Numerical operations, used by pandas
+numpy
+
+# Advanced plotting and visualization
+plotly
