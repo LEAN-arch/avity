@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils import generate_governance_data
+from datetime import date
 
 st.set_page_config(page_title="CDMO Governance | Avidity", layout="wide")
 st.title("🤝 CDMO Governance & Oversight")
@@ -17,7 +18,7 @@ st.header("Governance Program Effectiveness")
 total_actions = gov_df['Actions Generated'].sum()
 total_closed = gov_df['Actions Closed'].sum()
 closure_rate = (total_closed / total_actions) * 100 if total_actions > 0 else 100
-avg_days_to_close = 25 # Mocked for this example
+avg_days_to_close = 25
 
 kpi1, kpi2, kpi3 = st.columns(3)
 kpi1.metric("Total Engagements (YTD)", len(gov_df))
@@ -33,19 +34,19 @@ with col1:
     fig = go.Figure(go.Funnel(
         y = ["Engagements", "Actions Generated", "Actions Closed"],
         x = [len(gov_df), total_actions, total_closed],
-        textposition = "inside",
-        textinfo = "value+percent previous"
+        textposition = "inside", textinfo = "value+percent previous"
     ))
     fig.update_layout(height=400, title="From Meeting to Action to Closure")
     st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("How to Interpret the Funnel"):
+    with st.expander("Methodology & Actionability: Action Item Funnel"):
         st.markdown("""
-        **What it is:** This chart visualizes the flow and effectiveness of your governance process.
-        
-        **What it tells you:** It shows how many action items are generated per meeting on average, and more importantly, what percentage of those actions are actually being closed. A large drop-off between "Generated" and "Closed" indicates a problem with follow-through and accountability.
-        
-        **Actionability:** If the closure rate is low, use this data in your next QBR to reinforce the importance of closing actions and to investigate why items are being left open.
+        **Methodology:** A funnel chart visualizes the attrition or conversion rate through sequential stages of a process. Here, it tracks the lifecycle from discussion to action to closure.
+
+        **Significance & Insights:** This chart measures the **effectiveness of the governance process**. A large drop-off between "Actions Generated" and "Actions Closed" is a major red flag, indicating a problem with follow-through and accountability.
+
+        **Managerial Actionability:**
+        - **Action:** If the closure rate is low, use this objective data in the next QBR to address the accountability gap with the CDMO. It proves that discussions are not translating into completed work.
         """)
 
 with col2:
@@ -55,6 +56,14 @@ with col2:
     fig = px.density_heatmap(engagement_counts, x="YearMonth", y="CDMO", z="counts", histfunc="sum", color_continuous_scale="Blues", title="Monthly Engagement Frequency per CDMO")
     fig.update_layout(height=400)
     st.plotly_chart(fig, use_container_width=True)
+
+    with st.expander("Methodology & Actionability: Cadence Heatmap"):
+        st.markdown("""
+        **Methodology:** This heatmap visualizes the frequency of interactions over time.
+        **Significance & Insights:** It shows whether a regular cadence of communication is being maintained with each partner, as required by governance plans. Gaps may indicate a relationship or oversight risk.
+        **Actionability:**
+        - **Action:** Ensure that a consistent schedule of QBRs and technical meetings is maintained for all strategic partners.
+        """)
 
 st.header("Official Engagement Log")
 st.caption("A detailed, auditable log of all governance meetings.")
