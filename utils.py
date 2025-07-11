@@ -12,7 +12,7 @@ def generate_cdmo_data():
         'Expertise': ['Antibody Production', 'Oligonucleotide Synthesis', 'AOC Conjugation & Fill-Finish', 'Antibody Production'],
         'Avg. On-Time Delivery (%)': [98, 85, 99, 92],
         'Avg. Batch Success Rate (%)': [95, 100, 100, 98],
-        'Quality Score (1-100)': [88, 95, 99, 92], # NEW: Composite score of deviations, success rate
+        'Quality Score (1-100)': [88, 95, 99, 92],
         'Avg. Yield (%)': [82, 88, 85, 84],
         'Batches YTD': [12, 25, 4, 15],
         'BCP Status': ['Approved', 'Under Review', 'Draft', 'Approved'],
@@ -37,6 +37,25 @@ def generate_master_schedule():
         'Deviation ID': [None, 'DEV-24-015', None, None, None, 'DEV-24-018']
     }
     return pd.DataFrame(data)
+
+# --- START: FIX ---
+# Added the missing generate_risk_register function
+def generate_risk_register():
+    """Generates an enhanced risk register."""
+    data = {
+        'Risk ID': ['RSK-SUP-01', 'RSK-TECH-01', 'RSK-COMP-01', 'RSK-GEO-01'],
+        'CDMO': ['WuXi Biologics', 'Lonza Group', 'All', 'Catalent Pharma'],
+        'Description': ['Single-source for critical raw material faces shipping delays.', 'New conjugation process shows yield variability at scale.', 'Upcoming EMA inspection may scrutinize data integrity of batch records.', 'Geopolitical tensions could impact shipping lanes from US facility.'],
+        'Impact': [4, 4, 5, 3], # 1-5 Scale
+        'Probability': [3, 4, 2, 2], # 1-5 Scale
+        'Owner': ['Supply Chain', 'Tech Dev', 'Quality', 'Manager'],
+        'Mitigation Strategy': ['Qualify second supplier (Project OpEx-003).', 'Perform DOE to optimize process parameters.', 'Conduct internal audit and data review ahead of inspection.', 'Increase safety stock at domestic warehouse.'],
+        'Mitigation Status': ['In Progress', 'Planned', 'In Progress', 'Complete']
+    }
+    df = pd.DataFrame(data)
+    df['Risk Score'] = df['Impact'] * df['Probability']
+    return df.sort_values(by='Risk Score', ascending=False)
+# --- END: FIX ---
 
 def generate_spc_data(batch_id, parameter='Oligo Concentration'):
     """Generates detailed SPC data for a batch process step."""
