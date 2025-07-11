@@ -40,47 +40,65 @@ st.divider()
 # --- Main Visualizations ---
 col_quad, col_gantt = st.columns([1, 2])
 
+# --- START: Overhauled CDMO Performance Quadrant ---
 with col_quad:
     st.subheader("CDMO Performance Quadrant")
-    st.caption("On-Time Delivery vs. Batch Success Rate. Bubble size represents production volume.")
+    st.caption("On-Time Delivery vs. Batch Success Rate. Bubble size is production volume.")
+    
+    avg_otd = cdmo_df['Avg. On-Time Delivery (%)'].mean()
+    avg_bsr = cdmo_df['Avg. Batch Success Rate (%)'].mean()
+    
+    # Define generous axis ranges to ensure nothing is clipped
+    x_range = [cdmo_df['Avg. On-Time Delivery (%)'].min() - 10, 102]
+    y_range = [cdmo_df['Avg. Batch Success Rate (%)'].min() - 10, 102]
     
     fig = go.Figure()
-    # Add quadrant background colors
-    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0.5, y0=0.5, x1=1, y1=1, fillcolor="rgba(141, 198, 63, 0.1)", line_width=0, layer="below") # Top Right - Green
-    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0, y0=0.5, x1=0.5, y1=1, fillcolor="rgba(243, 112, 33, 0.1)", line_width=0, layer="below") # Top Left - Orange
-    fig.add_shape(type="rect", xref="paper", yref="paper", x0=0, y0=0, x1=1, y1=0.5, fillcolor="rgba(218, 41, 28, 0.1)", line_width=0, layer="below") # Bottom half - Red
-
-    # Add scatter plot (bubbles)
+    
+    # Add scatter plot (bubbles) first, so they are on the bottom layer
     fig.add_trace(go.Scatter(
         x=cdmo_df['Avg. On-Time Delivery (%)'],
         y=cdmo_df['Avg. Batch Success Rate (%)'],
         text=cdmo_df['CDMO Name'],
         mode='markers+text',
         marker=dict(
-            size=cdmo_df['Batches YTD'] * 2,  # Scale bubble size
+            size=cdmo_df['Batches YTD'] * 2.5,
             color=cdmo_df['Avg. Yield (%)'],
             colorscale='Viridis',
             showscale=True,
             colorbar=dict(title='Avg. Yield')
         ),
-        textposition="top center"
+        textposition="top center",
+        textfont=dict(size=12)
     ))
     
-    avg_otd = cdmo_df['Avg. On-Time Delivery (%)'].mean()
-    avg_bsr = cdmo_df['Avg. Batch Success Rate (%)'].mean()
+    # Add average lines
+    fig.add_vline(x=avg_otd, line_dash="dash", line_color="grey")
+    fig.add_hline(y=avg_bsr, line_dash="dash", line_color="grey")
     
-    fig.add_vline(x=avg_otd, line_dash="dash", annotation_text="Avg. OTD")
-    fig.add_hline(y=avg_bsr, line_dash="dash", annotation_text="Avg. Success")
+    # --- Add Explicit Quadrant Labels for Clarity ---
+    fig.add_annotation(x=x_range[1], y=y_range[1], text="<b>High Performers</b><br>Reliable & High Quality", showarrow=False, xanchor='right', yanchor='top', font=dict(color='green'))
+    fig.add_annotation(x=x_range[0], y=y_range[1], text="<b>Workhorses</b><br>Good Quality, Delivery Risk", showarrow=False, xanchor='left', yanchor='top', font=dict(color='orange'))
+    fig.add_annotation(x=x_range[0], y=y_range[0], text="<b>High Concern</b><br>Quality & Delivery Issues", showarrow=False, xanchor='left', yanchor='bottom', font=dict(color='red'))
+    fig.add_annotation(x=x_range[1], y=y_range[0], text="<b>Inconsistent</b><br>Reliable Delivery, Quality Varies", showarrow=False, xanchor='right', yanchor='bottom', font=dict(color='orange'))
 
+    # Add repositioned average line labels
+    fig.add_annotation(x=avg_otd, y=y_range[0], text="Avg. OTD", showarrow=False, yanchor='bottom', yshift=5)
+    fig.add_annotation(y=avg_bsr, x=x_range[0], text="Avg. Success", showarrow=False, xanchor='left', xshift=5)
+    
     fig.update_layout(
-        height=500,
+        title_text="CDMO On-Time Delivery vs. Quality",
+        height=520,
         xaxis_title="On-Time Delivery (%)",
         yaxis_title="Batch Success Rate (%)",
-        margin=dict(t=20, b=40, l=40, r=20),
-        xaxis=dict(range=[cdmo_df['Avg. On-Time Delivery (%)'].min()-5, cdmo_df['Avg. On-Time Delivery (%)'].max()+5]),
-        yaxis=dict(range=[cdmo_df['Avg. Batch Success Rate (%)'].min()-5, 101])
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(t=50, b=40, l=40, r=20),
+        xaxis=dict(range=x_range),
+        yaxis=dict(range=y_range),
+        showlegend=False
     )
     st.plotly_chart(fig, use_container_width=True)
+# --- END: Overhauled CDMO Performance Quadrant ---
+
 
 with col_gantt:
     st.subheader("Master Production Schedule & Deviations")
