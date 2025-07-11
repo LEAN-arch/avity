@@ -32,7 +32,22 @@ st.divider()
 st.header("Critical Path Analysis")
 st.caption("Gantt chart showing task durations, dependencies, and schedule variance. Red tasks are behind schedule.")
 
-# Color tasks based on variance
+# --- START: FIX for ValueError ---
+# Prepare a clean DataFrame specifically for Figure Factory, ensuring no duplicate column names.
+# Figure Factory requires the columns to be named 'Task', 'Start', and 'Finish'.
+gantt_df = df.copy()
+# We will use the unique Task ID for the Gantt chart's y-axis labels.
+# Drop the original descriptive 'Task' column to avoid a name clash.
+gantt_df = gantt_df.drop(columns=['Task'])
+# Rename the required columns to what Figure Factory expects.
+gantt_df = gantt_df.rename(columns={
+    'Task ID': 'Task',
+    'Start Date': 'Start',
+    'Finish Date': 'Finish'
+})
+# --- END: FIX for ValueError ---
+
+# Color tasks based on variance from the original DataFrame
 def get_task_color(variance):
     if pd.isna(variance): return 'rgb(128, 128, 128)' # Grey for planned
     if variance > 0: return 'rgb(218, 41, 28)' # Red for delayed
@@ -40,10 +55,10 @@ def get_task_color(variance):
 
 colors = [get_task_color(v) for v in df['Variance (Days)']]
 
-# Create the Gantt chart using Figure Factory
+# Create the Gantt chart using the cleaned gantt_df
 fig = ff.create_gantt(
-    df.rename(columns={'Task ID': 'Task', 'Start Date': 'Start', 'Finish Date': 'Finish'}),
-    index_col='Task',
+    gantt_df,
+    index_col='Lead Team', # Group tasks by the responsible team
     colors=colors,
     show_colorbar=False,
     group_tasks=True,
@@ -51,11 +66,12 @@ fig = ff.create_gantt(
     title="Tech Transfer Project Timeline"
 )
 
-# Add annotations for variance
+# Add annotations for variance using the original 'df' for easier data access
 for i, row in df.iterrows():
     if pd.notna(row['Variance (Days)']) and row['Variance (Days)'] != 0:
+        finish_date = row['Start Date'] + pd.to_timedelta(row['Actual Duration (Days)'], unit='d')
         fig.add_annotation(
-            x=row['Finish Date'], y=i,
+            x=finish_date, y=i,
             text=f"{row['Variance (Days):+g']}d",
             showarrow=False, xshift=25,
             font=dict(color="red" if row['Variance (Days)'] > 0 else "green")
