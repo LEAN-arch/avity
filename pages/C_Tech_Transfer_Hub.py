@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from utils import generate_tech_transfer_data
-from datetime import datetime
+from datetime import datetime, timedelta # <-- FIX: Added timedelta to the import
 
 st.set_page_config(page_title="Tech Transfer Hub | Avidity", layout="wide")
 st.title("🚀 Technology Transfer Hub")
@@ -12,6 +12,8 @@ st.markdown("### Managing the end-to-end transfer of Avidity's AOC processes to 
 
 # --- Data Preparation ---
 df = generate_tech_transfer_data()
+
+# This line will now work correctly
 df['Actual Finish Date'] = df.apply(
     lambda row: row['Start Date'] + timedelta(days=row['Actual Duration (Days)']) if pd.notna(row['Actual Duration (Days)']) else pd.NaT,
     axis=1
