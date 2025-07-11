@@ -2,62 +2,145 @@
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import plotly.figure_factory as ff
+import plotly.graph_objects as go
 from utils import generate_tech_transfer_data
+from datetime import datetime
 
 st.set_page_config(page_title="Tech Transfer Hub | Avidity", layout="wide")
 st.title("🚀 Technology Transfer Hub")
 st.markdown("### Managing the end-to-end transfer of Avidity's AOC processes to new CDMO facilities.")
 
+# --- Data Preparation ---
 df = generate_tech_transfer_data()
-df['Variance (Days)'] = df['Actual Duration (Days)'].fillna(0) - df['Planned Duration (Days)']
+df['Actual Finish Date'] = df.apply(
+    lambda row: row['Start Date'] + timedelta(days=row['Actual Duration (Days)']) if pd.notna(row['Actual Duration (Days)']) else pd.NaT,
+    axis=1
+)
+df['Variance (Days)'] = (df['Actual Finish Date'] - df['Finish Date']).dt.days.fillna(0)
 
+# --- KPIs ---
 st.header("Project Health: AOC-1044 Transfer to Lonza")
 total_duration = df['Planned Duration (Days)'].sum()
-schedule_variance = df['Variance (Days)'].sum()
-completed_tasks = df['Actual Duration (Days)'].notna().sum()
+# Calculate overall project finish date based on the max of actual or planned finish dates
+project_finish_date = max(df['Actual Finish Date'].max(), df['Finish Date'].max())
+project_start_date = df['Start Date'].min()
+schedule_variance = (project_finish_date - df['Finish Date'].max()).days
+completed_tasks = df['Progress (%)'].eq(100).sum()
 total_tasks = len(df)
+
 kpi1, kpi2, kpi3 = st.columns(3)
-kpi1.metric("Overall Schedule Variance", f"{schedule_variance} Days", delta_color="inverse")
-kpi2.metric("Task Completion", f"{completed_tasks} / {total_tasks}")
+kpi1.metric("Overall Schedule Variance", f"{schedule_variance} Days", delta=f"{schedule_variance} Days vs Plan", delta_color="inverse")
+kpi2.metric("Task Completion", f"{completed_tasks} / {total_tasks}", f"{completed_tasks/total_tasks:.0%} Complete")
 kpi3.metric("Planned Duration", f"{total_duration} Days")
 st.divider()
 
-st.header("Project Schedule & Risk Analysis")
-col1, col2 = st.columns(2)
+# --- Custom Gantt Chart ---
+st.header("Interactive Project Gantt Chart")
+st.caption("Color indicates task risk level. Progress is shown within each bar. Hover for full details.")
 
-with col1:
-    st.subheader("Critical Path Gantt Chart")
-    gantt_df = df.copy().drop(columns=['Task']).rename(columns={'Task ID': 'Task','Start Date': 'Start','Finish Date': 'Finish'})
-    def get_task_color(variance):
-        if pd.isna(variance): return 'rgb(128, 128, 128)'
-        if variance > 0: return 'rgb(218, 41, 28)'
-        return 'rgb(0, 63, 135)'
-    colors = [get_task_color(v) for v in df['Variance (Days)']]
-    fig = ff.create_gantt(gantt_df, index_col='Lead Team', colors=colors, show_colorbar=False, group_tasks=True, showgrid_x=True, title="Tech Transfer Project Timeline")
-    for i, row in df.iterrows():
-        if pd.notna(row['Variance (Days)']) and row['Variance (Days)'] != 0:
-            variance_val = row['Variance (Days)']
-            variance_text = f"{variance_val:+g}d"
-            finish_date = row['Start Date'] + pd.to_timedelta(row['Actual Duration (Days)'], unit='d')
-            fig.add_annotation(x=finish_date, y=i, text=variance_text, showarrow=False, xshift=25, font=dict(color="red" if variance_val > 0 else "green"))
-    fig.update_layout(height=500)
-    st.plotly_chart(fig, use_container_width=True)
+# --- Manual Legend ---
+st.write("""
+**Legend:**  
+<span style="background-color: #DC3912; padding: 2px 10px; border-radius: 5px; color: white;">High Risk</span>  
+<span style="background-color: #FF9900; padding: 2px 10px; border_radius: 5px; color: white;">Medium Risk</span>  
+<span style="background-color: #109618; padding: 2px 10px; border_radius: 5px; color: white;">Low Risk</span>
+""", unsafe_allow_html=True)
 
-with col2:
-    st.subheader("Task Risk Heatmap")
-    risk_map = {'Low': 1, 'Medium': 2, 'High': 3}
-    df['Risk Score'] = df['Risk Level'].map(risk_map)
-    fig = px.density_heatmap(df, x="Lead Team", y="Task ID", z="Risk Score", histfunc="avg", color_continuous_scale="Reds", title="Heatmap of High-Risk Tasks")
-    fig.update_layout(height=500)
-    st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("How to Interpret the Heatmap"):
-        st.markdown("""
-        **What it is:** This heatmap visualizes the concentration of risk within the project plan. Each cell represents a task, and the color intensity indicates its assigned risk level (High, Medium, Low).
-        
-        **What it tells you:** It immediately draws your attention to the highest-risk activities and which teams are responsible for them. A cluster of dark red cells indicates a high-risk project phase or a team with many critical responsibilities.
-        
-        **Actionability:** Focus your management and mitigation efforts on the darkest cells. For example, the high-risk "Transfer Process" task owned by Tech Dev should have a detailed mitigation plan and frequent follow-up.
-        """)
+fig = go.Figure()
+
+# Define colors based on risk
+risk_colors = {'High': '#DC3912', 'Medium': '#FF9900', 'Low': '#109618'}
+
+# Add traces for each task
+for i, task in df.iterrows():
+    # Background bar for the full planned task
+    fig.add_trace(go.Bar(
+        x=[task['Planned Duration (Days)']],
+        y=[task['Task']],
+        orientation='h',
+        base=[task['Start Date']],
+        marker_color='#E0E0E0',
+        hoverinfo='none',
+        showlegend=False,
+    ))
+    
+    # Foreground bar for the progress
+    progress_duration = task['Planned Duration (Days)'] * (task['Progress (%)'] / 100)
+    fig.add_trace(go.Bar(
+        x=[progress_duration],
+        y=[task['Task']],
+        orientation='h',
+        base=[task['Start Date']],
+        marker_color=risk_colors[task['Risk Level']],
+        text=f"{task['Progress (%)']}%",
+        textposition='inside',
+        insidetextanchor='middle',
+        showlegend=False,
+        hovertext=(
+            f"<b>{task['Task']}</b><br>"
+            f"Lead Team: {task['Lead Team']}<br>"
+            f"Risk: {task['Risk Level']}<br>"
+            f"Status: {task['Progress (%)']}% Complete<br>"
+            f"Planned: {task['Start Date'].strftime('%b %d')} - {task['Finish Date'].strftime('%b %d')} ({task['Planned Duration (Days)']}d)<br>"
+            f"Variance: {task['Variance (Days)']:+.0f}d"
+        ),
+        hoverinfo='text'
+    ))
+
+# Add milestone markers
+fig.add_trace(go.Scatter(
+    x=df['Finish Date'],
+    y=df['Task'],
+    mode='markers',
+    marker=dict(symbol='diamond', size=12, color='black'),
+    name='Planned Finish',
+    hoverinfo='none',
+    showlegend=False
+))
+
+# Today line
+fig.add_vline(x=datetime.today(), line_width=2, line_dash="dash", line_color="grey",
+              annotation_text="Today", annotation_position="bottom right")
+
+# Layout settings
+chart_height = len(df) * 40 + 150 # Dynamic height
+fig.update_layout(
+    title='Tech Transfer Project Timeline & Progress',
+    xaxis_title='Timeline',
+    yaxis_title=None,
+    barmode='overlay',
+    height=chart_height,
+    showlegend=False,
+    yaxis=dict(
+        autorange="reversed", # Puts first task at the top
+        tickfont=dict(size=12)
+    ),
+    xaxis=dict(
+        type='date',
+        tickformat='%b %Y', # Format for month and year
+        gridcolor='LightGray'
+    ),
+    plot_bgcolor='white',
+    margin=dict(l=10, r=10, t=50, b=50)
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+with st.expander("How to Interpret this Gantt Chart"):
+    st.markdown("""
+    **What it is:** This is a professional project management chart showing the timeline, progress, and risk for each task in the tech transfer project.
+
+    **How to Read It:**
+    - **Y-Axis:** Lists all project tasks.
+    - **X-Axis:** The project timeline.
+    - **Gray Background Bar:** Represents the full planned duration of the task.
+    - **Colored Foreground Bar:** Represents the actual progress. The length shows how much is complete, and the color indicates the task's inherent risk level.
+    - **Black Diamond:** Marks the planned completion date (milestone) for each task.
+    - **Gray Dashed Line:** Indicates today's date for context.
+    
+    **Actionability:**
+    - **Focus on Red:** Immediately identify **High Risk** tasks.
+    - **Check Progress vs. Today:** Pay close attention to any task where the colored progress bar has not yet crossed the "Today" line, especially if it's a high-risk task. This indicates it is behind schedule and requires immediate managerial intervention.
+    - **Hover for Details:** Get all the critical data for any task instantly by hovering over its bar.
+    """)
