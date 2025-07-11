@@ -32,20 +32,14 @@ st.divider()
 st.header("Critical Path Analysis")
 st.caption("Gantt chart showing task durations, dependencies, and schedule variance. Red tasks are behind schedule.")
 
-# --- START: FIX for ValueError ---
-# Prepare a clean DataFrame specifically for Figure Factory, ensuring no duplicate column names.
-# Figure Factory requires the columns to be named 'Task', 'Start', and 'Finish'.
+# Prepare a clean DataFrame specifically for Figure Factory
 gantt_df = df.copy()
-# We will use the unique Task ID for the Gantt chart's y-axis labels.
-# Drop the original descriptive 'Task' column to avoid a name clash.
 gantt_df = gantt_df.drop(columns=['Task'])
-# Rename the required columns to what Figure Factory expects.
 gantt_df = gantt_df.rename(columns={
     'Task ID': 'Task',
     'Start Date': 'Start',
     'Finish Date': 'Finish'
 })
-# --- END: FIX for ValueError ---
 
 # Color tasks based on variance from the original DataFrame
 def get_task_color(variance):
@@ -58,7 +52,7 @@ colors = [get_task_color(v) for v in df['Variance (Days)']]
 # Create the Gantt chart using the cleaned gantt_df
 fig = ff.create_gantt(
     gantt_df,
-    index_col='Lead Team', # Group tasks by the responsible team
+    index_col='Lead Team',
     colors=colors,
     show_colorbar=False,
     group_tasks=True,
@@ -66,15 +60,22 @@ fig = ff.create_gantt(
     title="Tech Transfer Project Timeline"
 )
 
+# --- START: FIX for KeyError ---
 # Add annotations for variance using the original 'df' for easier data access
 for i, row in df.iterrows():
     if pd.notna(row['Variance (Days)']) and row['Variance (Days)'] != 0:
+        # First, get the value from the Series
+        variance_val = row['Variance (Days)']
+        # Then, apply the f-string formatting to the variable
+        variance_text = f"{variance_val:+g}d"
+        
         finish_date = row['Start Date'] + pd.to_timedelta(row['Actual Duration (Days)'], unit='d')
         fig.add_annotation(
             x=finish_date, y=i,
-            text=f"{row['Variance (Days):+g']}d",
+            text=variance_text, # Use the formatted text
             showarrow=False, xshift=25,
-            font=dict(color="red" if row['Variance (Days)'] > 0 else "green")
+            font=dict(color="red" if variance_val > 0 else "green")
         )
+# --- END: FIX for KeyError ---
 
 st.plotly_chart(fig, use_container_width=True)
