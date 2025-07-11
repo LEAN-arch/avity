@@ -36,44 +36,74 @@ st.divider()
 st.header("Interactive Project Gantt Chart")
 st.caption("Color indicates task risk level. Progress is shown within each bar. Hover for full details.")
 
-st.write("""
-**Legend:**  
-<span style="background-color: #DC3912; padding: 2px 10px; border-radius: 5px; color: white;">High Risk</span>  
-<span style="background-color: #FF9900; padding: 2px 10px; border_radius: 5px; color: white;">Medium Risk</span>  
-<span style="background-color: #109618; padding: 2px 10px; border_radius: 5px; color: white;">Low Risk</span>
+# --- START: FIX for Milestone Diamond Colors ---
+# Define colors based on risk
+risk_colors = {'High': '#DC3912', 'Medium': '#FF9900', 'Low': '#109618'}
+
+# Update the manual legend to be more precise
+st.write(f"""
+**Legend:** Task bar and milestone diamond (<span style="color:black;">♦</span>) colors indicate risk level:  
+<span style="background-color:{risk_colors['High']}; padding: 2px 10px; border-radius: 5px; color: white;">High Risk</span>  
+<span style="background-color:{risk_colors['Medium']}; padding: 2px 10px; border_radius: 5px; color: white;">Medium Risk</span>  
+<span style="background-color:{risk_colors['Low']}; padding: 2px 10px; border_radius: 5px; color: white;">Low Risk</span>
 """, unsafe_allow_html=True)
 
 
 fig = go.Figure()
-risk_colors = {'High': '#DC3912', 'Medium': '#FF9900', 'Low': '#109618'}
 
+# Add traces for each task
 for i, task in df.iterrows():
-    fig.add_trace(go.Bar(x=[task['Planned Duration (Days)']], y=[task['Task']], orientation='h', base=[task['Start Date']], marker_color='#E0E0E0', hoverinfo='none', showlegend=False))
+    # Background bar for the full planned task
+    fig.add_trace(go.Bar(
+        x=[task['Planned Duration (Days)']], y=[task['Task']], orientation='h',
+        base=[task['Start Date']], marker_color='#E0E0E0',
+        hoverinfo='none', showlegend=False,
+    ))
+    
+    # Foreground bar for the progress
     progress_duration = task['Planned Duration (Days)'] * (task['Progress (%)'] / 100)
     fig.add_trace(go.Bar(
-        x=[progress_duration], y=[task['Task']], orientation='h', base=[task['Start Date']],
-        marker_color=risk_colors[task['Risk Level']], text=f"{task['Progress (%)']}%", textposition='inside', insidetextanchor='middle', showlegend=False,
-        hovertext=(f"<b>{task['Task']}</b><br>Lead Team: {task['Lead Team']}<br>Risk: {task['Risk Level']}<br>Status: {task['Progress (%)']}% Complete<br>Planned: {task['Start Date'].strftime('%b %d')} - {task['Finish Date'].strftime('%b %d')} ({task['Planned Duration (Days)']}d)<br>Variance: {task['Variance (Days)']:+.0f}d"),
+        x=[progress_duration], y=[task['Task']], orientation='h',
+        base=[task['Start Date']], marker_color=risk_colors[task['Risk Level']],
+        text=f"{task['Progress (%)']}%", textposition='inside', insidetextanchor='middle',
+        showlegend=False,
+        hovertext=(
+            f"<b>{task['Task']}</b><br>"
+            f"Lead Team: {task['Lead Team']}<br>"
+            f"Risk: {task['Risk Level']}<br>"
+            f"Status: {task['Progress (%)']}% Complete<br>"
+            f"Planned: {task['Start Date'].strftime('%b %d')} - {task['Finish Date'].strftime('%b %d')} ({task['Planned Duration (Days)']}d)<br>"
+            f"Variance: {task['Variance (Days)']:+.0f}d"
+        ),
         hoverinfo='text'
     ))
 
-fig.add_trace(go.Scatter(x=df['Finish Date'], y=df['Task'], mode='markers', marker=dict(symbol='diamond', size=12, color='black'), name='Planned Finish', hoverinfo='none', showlegend=False))
+# Create a list of colors for the milestone markers based on risk level
+milestone_colors = df['Risk Level'].map(risk_colors).tolist()
 
-# --- START: FIX for TypeError ---
-# Manually add the "Today" line as a shape and its annotation separately
+# Add milestone markers with risk-based colors
+fig.add_trace(go.Scatter(
+    x=df['Finish Date'],
+    y=df['Task'],
+    mode='markers',
+    marker=dict(
+        symbol='diamond',
+        size=14,
+        color=milestone_colors, # Use the list of colors
+        line=dict(width=1, color='DarkSlateGray') # Add a border for visibility
+    ),
+    name='Planned Finish',
+    hoverinfo='none',
+    showlegend=False
+))
+# --- END: FIX for Milestone Diamond Colors ---
+
+# Today line
 today = datetime.today()
-fig.add_shape(
-    type='line',
-    x0=today, y0=-0.5, x1=today, y1=len(df)-0.5, # Span the full y-axis
-    line=dict(color='grey', width=2, dash='dash')
-)
-fig.add_annotation(
-    x=today, y=len(df)-0.5, # Position annotation at the top of the line
-    text="Today", showarrow=False,
-    xshift=10, yshift=10, font=dict(color="grey")
-)
-# --- END: FIX for TypeError ---
+fig.add_shape(type='line', x0=today, y0=-0.5, x1=today, y1=len(df)-0.5, line=dict(color='grey', width=2, dash='dash'))
+fig.add_annotation(x=today, y=len(df)-0.5, text="Today", showarrow=False, xshift=10, yshift=10, font=dict(color="grey"))
 
+# Layout settings
 chart_height = len(df) * 40 + 150
 fig.update_layout(
     title='Tech Transfer Project Timeline & Progress',
@@ -93,10 +123,10 @@ with st.expander("How to Interpret this Gantt Chart"):
     - **X-Axis:** The project timeline.
     - **Gray Background Bar:** Represents the full planned duration of the task.
     - **Colored Foreground Bar:** Represents the actual progress. The length shows how much is complete, and the color indicates the task's inherent risk level.
-    - **Black Diamond:** Marks the planned completion date (milestone) for each task.
+    - **Colored Diamond (<span style="color:black;">♦</span>):** Marks the planned completion date (milestone). **Its color also indicates the task's risk level.**
     - **Gray Dashed Line:** Indicates today's date for context.
     **Actionability:**
-    - **Focus on Red:** Immediately identify **High Risk** tasks.
+    - **Focus on Red:** Immediately identify **High Risk** tasks by their red bars and red diamonds.
     - **Check Progress vs. Today:** Pay close attention to any task where the colored progress bar has not yet crossed the "Today" line, especially if it's a high-risk task. This indicates it is behind schedule and requires immediate managerial intervention.
     - **Hover for Details:** Get all the critical data for any task instantly by hovering over its bar.
     """)
