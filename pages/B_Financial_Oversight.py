@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from utils import generate_budget_data
+from datetime import date # <-- FIX: Added the missing import
 
 st.set_page_config(page_title="Financial Oversight | Avidity", layout="wide")
 
@@ -18,7 +19,8 @@ st.header("Total Program Financial Health")
 total_budget = budget_df['Annual Budget ($M)'].sum()
 total_actuals = budget_df['YTD Actuals ($M)'].sum()
 total_forecast = budget_df['YTD Forecast ($M)'].sum()
-burn_rate = total_actuals / (date.today().month / 12) # Simplified burn rate
+# This line will now work correctly
+burn_rate = total_actuals / (date.today().month / 12) if date.today().month > 0 else 0 
 
 fin_col1, fin_col2, fin_col3, fin_col4 = st.columns(4)
 fin_col1.metric("Total Annual Budget", f"${total_budget:.1f}M")
