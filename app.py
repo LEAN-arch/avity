@@ -57,22 +57,28 @@ with col_quad:
     ))
     fig.add_vline(x=avg_otd, line_dash="dash", line_color="grey")
     fig.add_hline(y=avg_quality, line_dash="dash", line_color="grey")
-    fig.add_annotation(x=x_range[1], y=y_range[1], text="<b>Strategic Partners</b><br>High Quality & Reliable", showarrow=False, xanchor='right', yanchor='top', font=dict(color='green'))
+    fig.add_annotation(x=x_range[1], y=y_range[1], text="<b>Strategic Partners</b><br>Reliable & High Quality", showarrow=False, xanchor='right', yanchor='top', font=dict(color='green'))
     fig.add_annotation(x=x_range[0], y=y_range[1], text="<b>Quality Focus</b><br>High Quality, Delivery Risk", showarrow=False, xanchor='left', yanchor='top', font=dict(color='orange'))
     fig.add_annotation(x=x_range[0], y=y_range[0], text="<b>High Concern</b><br>Performance Plans Needed", showarrow=False, xanchor='left', yanchor='bottom', font=dict(color='red'))
-    fig.add_annotation(x=x_range[1], y=y_range[0], text="<b>Delivery Focus</b><br>Reliable, Quality Varies", showarrow=False, xanchor='right', yanchor='bottom', font=dict(color='orange'))
+    fig.add_annotation(x=x_range[1], y=y_range[0], text="<b>Inconsistent</b><br>Reliable, Quality Varies", showarrow=False, xanchor='right', yanchor='bottom', font=dict(color='orange'))
     fig.update_layout(height=450, xaxis_title="On-Time Delivery (%)", yaxis_title="Quality Score (Composite)", plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=20, b=40, l=40, r=20), xaxis=dict(range=x_range), yaxis=dict(range=y_range), showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("What is the Performance Quadrant?"):
+    with st.expander("Methodology & Actionability: Performance Quadrant"):
         st.markdown("""
-        **What it is:** This chart plots each CDMO based on two key axes: operational reliability (On-Time Delivery) and product quality (a composite score including success rate and deviation frequency). The size of each bubble represents the volume of batches produced this year.
-        
-        **What it tells you:** It provides a rapid strategic assessment of the entire CDMO network.
-        - **Top-Right (Strategic Partners):** These are your best-performing partners. Leverage and protect these relationships.
-        - **Bottom-Left (High Concern):** These partners are underperforming on both fronts and require immediate and intensive management focus.
-        
-        **Actionability:** Use this chart to prioritize your management efforts. A large bubble in a poor quadrant (e.g., WuXi) is a major portfolio risk that needs immediate attention.
+        **Methodology:** This is a 2x2 matrix, a powerful business analysis tool for strategic segmentation. It plots each CDMO based on two critical performance dimensions: operational reliability (X-axis) and a composite quality score (Y-axis). Additional dimensions are encoded using bubble size (production volume) and color (average process yield). The quadrant lines are dynamically placed at the portfolio's mean performance, allowing for relative assessment.
+
+        **Significance & Insights:**
+        - **Top-Right (Strategic Partners):** High reliability and quality. These are your best partners.
+        - **Top-Left (Quality Focus):** High quality but struggle with timeliness, suggesting logistical or scheduling challenges rather than technical ones.
+        - **Bottom-Right (Delivery Focus):** Reliable delivery but inconsistent quality, pointing to potential issues with process control or deviation management.
+        - **Bottom-Left (High Concern):** Underperform on both axes. A large bubble here represents a major portfolio risk.
+
+        **Managerial Actionability:**
+        - **Action:** Engage "High Concern" partners with a formal Performance Improvement Plan (PIP).
+        - **Action:** Work with "Quality Focus" partners on logistics and scheduling.
+        - **Action:** Launch technical deep-dives with "Delivery Focus" partners to improve process control.
+        - **Action:** Nurture and reward "Strategic Partners" with new, high-value projects.
         """)
 
 with col_treemap:
@@ -90,11 +96,13 @@ with col_treemap:
     fig.update_layout(height=450, margin = dict(t=50, l=25, r=25, b=25))
     st.plotly_chart(fig, use_container_width=True)
 
-    with st.expander("What is the Treemap?"):
+    with st.expander("Methodology & Actionability: Treemap"):
         st.markdown("""
-        **What it is:** This chart visualizes the composition of your production portfolio. The size of each rectangle represents the number of batches in that category.
-        
-        **What it tells you:** It shows where your production volume and risk are concentrated. You can quickly see which programs (e.g., DM1) and which CDMOs dominate your manufacturing activities.
-        
-        **Actionability:** A large red or maroon area (At Risk/Failed) within a key program or CDMO highlights a significant, concentrated risk to supply. Click on the rectangles to drill down and explore the data hierarchy.
+        **Methodology:** A treemap is a space-filling visualization for hierarchical data. It uses nested rectangles where the area of each rectangle is directly proportional to its value (here, the count of batches).
+
+        **Significance & Insights:** The chart instantly reveals concentration. You can see in seconds which **Program** (e.g., DM1) constitutes the largest portion of the manufacturing workload, which **CDMO** is responsible for the most batches, and crucially, how the **risk** (At Risk/Failed batches) is distributed across them.
+
+        **Managerial Actionability:**
+        - **Action:** If a large rectangle representing a key program contains significant red or maroon sub-rectangles (At Risk/Failed), this is a critical supply risk requiring immediate escalation and the formation of a dedicated task force.
+        - **Action:** Use this to justify resource allocation. The largest program areas should have the most robust oversight and support.
         """)
