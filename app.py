@@ -26,103 +26,75 @@ st.header("Portfolio Performance: Key Technical Indicators")
 total_batches = len(schedule_df)
 schedule_df['Cycle Time Variance (Days)'] = schedule_df['Actual Cycle Time (Days)'] - schedule_df['Planned Cycle Time (Days)']
 avg_cycle_time_variance = schedule_df['Cycle Time Variance (Days)'].mean()
-overall_yield = schedule_df['Yield (%)'].mean()
-batch_success_rate = (1 - (len(schedule_df[schedule_df['Status'] == 'Failed']) / total_batches)) * 100 if total_batches > 0 else 100
+shipped_batches = schedule_df[schedule_df['Status'] == 'Shipped']
+right_first_time = (1 - (shipped_batches['Deviation ID'].notna().sum() / len(shipped_batches))) * 100 if not shipped_batches.empty else 100
+active_cdmos = cdmo_df[cdmo_df['Status'] == 'Active'].shape[0]
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Overall Batch Success Rate", f"{batch_success_rate:.1f}%", help="Percentage of all batches that met all specifications without failure.")
-col2.metric("Avg. Cycle Time Variance", f"{avg_cycle_time_variance:.1f} Days", help="Positive value indicates batches are taking longer than planned.", delta_color="inverse")
-col3.metric("Portfolio Avg. Yield", f"{overall_yield:.1f}%", help="Average final yield across all completed batches.")
-col4.metric("Active Production Batches", schedule_df[schedule_df['Status'] == 'In Production'].shape[0])
+col1.metric("Active CDMOs", active_cdmos, help="Number of currently active manufacturing partners.")
+col2.metric("Right First Time (RFT)", f"{right_first_time:.1f}%", help="Percentage of completed batches shipped without a deviation.")
+col3.metric("Avg. Cycle Time Variance", f"{avg_cycle_time_variance:.1f} Days", help="Positive value indicates batches are taking longer than planned.", delta_color="inverse")
+col4.metric("Batches At Risk / Failed", schedule_df[schedule_df['Status'].isin(['At Risk', 'Failed'])].shape[0], help="Total count of batches currently at risk or failed.")
 st.divider()
-
 
 # --- Main Visualizations ---
-col_quad, col_gantt = st.columns([1, 2])
+st.header("Portfolio Overview: Performance & Production Volume")
+col_quad, col_treemap = st.columns(2)
 
-# --- START: Overhauled CDMO Performance Quadrant ---
 with col_quad:
     st.subheader("CDMO Performance Quadrant")
-    st.caption("On-Time Delivery vs. Batch Success Rate. Bubble size is production volume.")
-    
     avg_otd = cdmo_df['Avg. On-Time Delivery (%)'].mean()
-    avg_bsr = cdmo_df['Avg. Batch Success Rate (%)'].mean()
-    
-    # Define generous axis ranges to ensure nothing is clipped
-    x_range = [cdmo_df['Avg. On-Time Delivery (%)'].min() - 10, 102]
-    y_range = [cdmo_df['Avg. Batch Success Rate (%)'].min() - 10, 102]
+    avg_quality = cdmo_df['Quality Score (1-100)'].mean()
+    x_range = [cdmo_df['Avg. On-Time Delivery (%)'].min() - 5, 102]
+    y_range = [cdmo_df['Quality Score (1-100)'].min() - 5, 102]
     
     fig = go.Figure()
-    
-    # Add scatter plot (bubbles) first, so they are on the bottom layer
     fig.add_trace(go.Scatter(
-        x=cdmo_df['Avg. On-Time Delivery (%)'],
-        y=cdmo_df['Avg. Batch Success Rate (%)'],
-        text=cdmo_df['CDMO Name'],
-        mode='markers+text',
-        marker=dict(
-            size=cdmo_df['Batches YTD'] * 2.5,
-            color=cdmo_df['Avg. Yield (%)'],
-            colorscale='Viridis',
-            showscale=True,
-            colorbar=dict(title='Avg. Yield')
-        ),
-        textposition="top center",
-        textfont=dict(size=12)
+        x=cdmo_df['Avg. On-Time Delivery (%)'], y=cdmo_df['Quality Score (1-100)'],
+        text=cdmo_df['CDMO Name'], mode='markers+text',
+        marker=dict(size=cdmo_df['Batches YTD'] * 2.5, color=cdmo_df['Avg. Yield (%)'], colorscale='Viridis', showscale=True, colorbar=dict(title='Avg. Yield')),
+        textposition="top center", textfont=dict(size=12)
     ))
-    
-    # Add average lines
     fig.add_vline(x=avg_otd, line_dash="dash", line_color="grey")
-    fig.add_hline(y=avg_bsr, line_dash="dash", line_color="grey")
-    
-    # --- Add Explicit Quadrant Labels for Clarity ---
-    fig.add_annotation(x=x_range[1], y=y_range[1], text="<b>High Performers</b><br>Reliable & High Quality", showarrow=False, xanchor='right', yanchor='top', font=dict(color='green'))
-    fig.add_annotation(x=x_range[0], y=y_range[1], text="<b>Workhorses</b><br>Good Quality, Delivery Risk", showarrow=False, xanchor='left', yanchor='top', font=dict(color='orange'))
-    fig.add_annotation(x=x_range[0], y=y_range[0], text="<b>High Concern</b><br>Quality & Delivery Issues", showarrow=False, xanchor='left', yanchor='bottom', font=dict(color='red'))
-    fig.add_annotation(x=x_range[1], y=y_range[0], text="<b>Inconsistent</b><br>Reliable Delivery, Quality Varies", showarrow=False, xanchor='right', yanchor='bottom', font=dict(color='orange'))
-
-    # Add repositioned average line labels
-    fig.add_annotation(x=avg_otd, y=y_range[0], text="Avg. OTD", showarrow=False, yanchor='bottom', yshift=5)
-    fig.add_annotation(y=avg_bsr, x=x_range[0], text="Avg. Success", showarrow=False, xanchor='left', xshift=5)
-    
-    fig.update_layout(
-        title_text="CDMO On-Time Delivery vs. Quality",
-        height=520,
-        xaxis_title="On-Time Delivery (%)",
-        yaxis_title="Batch Success Rate (%)",
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=50, b=40, l=40, r=20),
-        xaxis=dict(range=x_range),
-        yaxis=dict(range=y_range),
-        showlegend=False
-    )
+    fig.add_hline(y=avg_quality, line_dash="dash", line_color="grey")
+    fig.add_annotation(x=x_range[1], y=y_range[1], text="<b>Strategic Partners</b><br>High Quality & Reliable", showarrow=False, xanchor='right', yanchor='top', font=dict(color='green'))
+    fig.add_annotation(x=x_range[0], y=y_range[1], text="<b>Quality Focus</b><br>High Quality, Delivery Risk", showarrow=False, xanchor='left', yanchor='top', font=dict(color='orange'))
+    fig.add_annotation(x=x_range[0], y=y_range[0], text="<b>High Concern</b><br>Performance Plans Needed", showarrow=False, xanchor='left', yanchor='bottom', font=dict(color='red'))
+    fig.add_annotation(x=x_range[1], y=y_range[0], text="<b>Delivery Focus</b><br>Reliable, Quality Varies", showarrow=False, xanchor='right', yanchor='bottom', font=dict(color='orange'))
+    fig.update_layout(height=450, xaxis_title="On-Time Delivery (%)", yaxis_title="Quality Score (Composite)", plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=20, b=40, l=40, r=20), xaxis=dict(range=x_range), yaxis=dict(range=y_range), showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
-# --- END: Overhauled CDMO Performance Quadrant ---
 
+    with st.expander("What is the Performance Quadrant?"):
+        st.markdown("""
+        **What it is:** This chart plots each CDMO based on two key axes: operational reliability (On-Time Delivery) and product quality (a composite score including success rate and deviation frequency). The size of each bubble represents the volume of batches produced this year.
+        
+        **What it tells you:** It provides a rapid strategic assessment of the entire CDMO network.
+        - **Top-Right (Strategic Partners):** These are your best-performing partners. Leverage and protect these relationships.
+        - **Bottom-Left (High Concern):** These partners are underperforming on both fronts and require immediate and intensive management focus.
+        
+        **Actionability:** Use this chart to prioritize your management efforts. A large bubble in a poor quadrant (e.g., WuXi) is a major portfolio risk that needs immediate attention.
+        """)
 
-with col_gantt:
-    st.subheader("Master Production Schedule & Deviations")
-    st.caption("Timeline of all active and planned batches across the network. Red indicates a deviation.")
-    fig = px.timeline(
+with col_treemap:
+    st.subheader("Production Volume by Program & CDMO")
+    fig = px.treemap(
         schedule_df,
-        x_start="Start Date",
-        x_end="End Date",
-        y="CDMO",
-        color="Status",
-        hover_name="Batch ID",
-        hover_data={"Status": True, "Product": True, "Deviation ID": True},
-        title="Production & Release Timeline by Status",
+        path=[px.Constant("All Programs"), 'Program', 'CDMO', 'Status'],
+        title="Batch Distribution Across Portfolio",
         color_discrete_map={
-            'In Production': '#00AEEF',
-            'Awaiting Release': '#8DC63F',
-            'Shipped': '#003F87',
-            'At Risk': '#F37021',
-            'Delayed': '#DA291C',
-            'Planned': 'grey'
-        }
+            '(?)':'#2ca02c', 'DM1':'#003F87', 'DMD':'#00AEEF', 'FSHD':'#8DC63F',
+            'Catalent Pharma':'#F37021', 'WuXi Biologics':'#662D91',
+            'At Risk':'red', 'Failed':'maroon'
+            }
     )
-    fig.update_yaxes(categoryorder="total ascending")
+    fig.update_layout(height=450, margin = dict(t=50, l=25, r=25, b=25))
     st.plotly_chart(fig, use_container_width=True)
 
-st.divider()
-st.info("This dashboard provides a real-time, technical overview of the entire external manufacturing portfolio. Use the pages in the sidebar to perform deep-dive analyses into specific CDMOs, financials, or projects.")
+    with st.expander("What is the Treemap?"):
+        st.markdown("""
+        **What it is:** This chart visualizes the composition of your production portfolio. The size of each rectangle represents the number of batches in that category.
+        
+        **What it tells you:** It shows where your production volume and risk are concentrated. You can quickly see which programs (e.g., DM1) and which CDMOs dominate your manufacturing activities.
+        
+        **Actionability:** A large red or maroon area (At Risk/Failed) within a key program or CDMO highlights a significant, concentrated risk to supply. Click on the rectangles to drill down and explore the data hierarchy.
+        """)
