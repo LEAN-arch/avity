@@ -1,13 +1,7 @@
 # utils.py
 import pandas as pd
 import numpy as np
-# REMOVED plotly imports as they are not used directly in this file
 from datetime import date, timedelta
-
-# --- START: FIX ---
-# The line "from utils import ..." has been completely removed.
-# All other functions remain the same.
-# --- END: FIX ---
 
 def generate_cdmo_data():
     """Generates a list of mock CDMO partners with enriched performance and BCP metrics."""
@@ -154,6 +148,3 @@ def generate_op_ex_data():
     df = pd.DataFrame(data)
     df['ROI'] = df['Financial Impact ($K/yr)'] / df['Implementation Cost ($K)']
     return df
-        st.success(f"No specific risks currently logged for {selected_cdmo}.")
-    else:
-        st.data_editor(cdmo_risks, column_config={"Mitigation Status": st.column_config.SelectboxColumn("Status", options=['Planned', 'In Progress', 'Complete', 'On Hold'], required=True), "Risk Score": st.column_config.ProgressColumn("Score", min_value=0, max_value=25, format="%d")}, use_container_width=True, hide_index=True)
