@@ -8,7 +8,7 @@ from utils import (
     generate_cdmo_data, generate_master_schedule, generate_spc_data, 
     generate_quality_data, generate_risk_register, generate_cdmo_kpis, generate_cpk_data
 )
-from datetime import date
+from datetime import date, datetime
 
 st.set_page_config(page_title="CDMO Drilldown | Avidity", layout="wide")
 
@@ -20,7 +20,11 @@ risk_master_df = generate_risk_register()
 
 # --- Sidebar for CDMO Selection ---
 st.sidebar.title("CDMO Selection")
-selected_cdmo = st.sidebar.selectbox("Select a CDMO to view details", cdmo_master_df['CDMO Name'], index=0)
+selected_cdmo = st.sidebar.selectbox(
+    "Select a CDMO to view details",
+    cdmo_master_df['CDMO Name'],
+    index=0 # Default to the first CDMO
+)
 
 # --- Header ---
 st.title(f"Technical Drilldown: {selected_cdmo}")
@@ -31,16 +35,25 @@ st.divider()
 # --- DYNAMIC DATA GENERATION & FILTERING ---
 cdmo_schedule = schedule_master_df[schedule_master_df['CDMO'] == selected_cdmo]
 cdmo_risks = risk_master_df[risk_master_df['CDMO'].isin([selected_cdmo, 'All'])]
-cdmo_quality = quality_master_df[quality_master_df['CDMO'] == selected_cdmo]
+cdmo_quality = quality_master_df[quality_master_df['CDMO'] == selected_cdmo].copy() # Use .copy() to avoid SettingWithCopyWarning
 kpi_df = generate_cdmo_kpis(selected_cdmo)
 cpk_df = generate_cpk_data(selected_cdmo)
+
+# --- START: FIX for KeyError ---
+# Dynamically calculate 'Days Open' for all records
+if not cdmo_quality.empty:
+    cdmo_quality['Open Date'] = pd.to_datetime(cdmo_quality['Open Date'])
+    cdmo_quality['Days Open'] = cdmo_quality.apply(
+        lambda row: (datetime.now() - row['Open Date']).days if pd.isna(row['Closed Date']) else (pd.to_datetime(row['Closed Date']) - row['Open Date']).days,
+        axis=1
+    )
+# --- END: FIX for KeyError ---
 
 # --- Tabbed Layout ---
 tab1, tab2, tab3, tab4 = st.tabs(["📈 Operational Performance", "🔬 Batch Deep Dive", "📋 Quality Systems", "🛡️ Continuity & Mitigation"])
 
 with tab1:
-    # This tab remains the same as it was already highly technical
-    st.header("Operational Performance Dashboard") # ... content ...
+    st.header("Operational Performance Dashboard")
     st.caption("Historical performance trends and long-term process stability for this partner.")
     kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
     kpi_col1.metric("Latest On-Time Delivery", f"{kpi_df['On-Time Delivery (%)'].iloc[-1]:.1f}%")
@@ -48,14 +61,14 @@ with tab1:
     kpi_col3.metric("Batches in Production", cdmo_schedule[cdmo_schedule['Status'] == 'In Production'].shape[0])
     st.divider()
     col_hist, col_spc = st.columns(2)
-    with col_hist: # ... content ...
+    with col_hist:
         st.subheader("Historical KPI Trends")
         fig1 = go.Figure()
         fig1.add_trace(go.Scatter(x=kpi_df['Quarter'], y=kpi_df['On-Time Delivery (%)'], name='On-Time Delivery (%)'))
         fig1.add_trace(go.Scatter(x=kpi_df['Quarter'], y=kpi_df['Deviations per Batch'], name='Devs per Batch', yaxis='y2'))
         fig1.update_layout(height=400, title="Quarterly Performance Trends", yaxis=dict(title='On-Time Delivery (%)'), yaxis2=dict(title='Deviations per Batch', overlaying='y', side='right'), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig1, use_container_width=True)
-    with col_spc: # ... content ...
+    with col_spc:
         st.subheader("Cycle Time Performance (XmR Chart)")
         completed_batches = cdmo_schedule.dropna(subset=['Actual Cycle Time (Days)'])
         if not completed_batches.empty and len(completed_batches) > 1:
@@ -74,8 +87,7 @@ with tab1:
             st.info("At least two completed batches are needed to calculate control limits for cycle time.")
 
 with tab2:
-    # This tab also remains the same
-    st.header("Batch Deep Dive & Process Capability") # ... content ...
+    st.header("Batch Deep Dive & Process Capability")
     col_batch, col_cpk = st.columns([2,1])
     with col_batch:
         st.subheader("Batch-Specific SPC Analysis")
@@ -96,7 +108,7 @@ with tab2:
                 st.plotly_chart(fig_spc, use_container_width=True)
         else:
             st.info("No batches scheduled for this CDMO.")
-    with col_cpk: # ... content ...
+    with col_cpk:
         st.subheader("Process Capability (Cpk)")
         st.info("Cpk > 1.33 is capable. Cpk < 1.0 is not capable.")
         fig_cpk = px.bar(cpk_df, x='Cpk Value', y='Parameter', orientation='h', title='Process Capability', text='Cpk Value')
@@ -106,7 +118,6 @@ with tab2:
         fig_cpk.update_layout(height=400, yaxis_title=None, margin=dict(t=40, b=20))
         st.plotly_chart(fig_cpk, use_container_width=True)
 
-# --- START: Overhauled Quality Systems Tab ---
 with tab3:
     st.header(f"Quality Systems Analysis for {selected_cdmo}")
     st.caption("Analyze quality event trends, root causes, and closure effectiveness.")
@@ -114,10 +125,10 @@ with tab3:
     if cdmo_quality.empty:
         st.success("No open quality records for this CDMO.")
     else:
-        # --- KPIs for Quality ---
         q_kpi1, q_kpi2, q_kpi3 = st.columns(3)
         open_records = cdmo_quality[cdmo_quality['Status'] != 'Closed']
         q_kpi1.metric("Open Quality Records", len(open_records))
+        # This line will now work correctly
         q_kpi2.metric("Avg. Days Open", f"{open_records['Days Open'].mean():.1f}")
         critical_high = open_records[open_records['Priority'].isin(['Critical', 'High'])]
         q_kpi3.metric("Open Critical/High Priority", len(critical_high), delta_color="inverse")
@@ -132,7 +143,6 @@ with tab3:
                 pareto_data.columns = ['Category', 'Count']
                 pareto_data = pareto_data.sort_values(by='Count', ascending=False)
                 pareto_data['Cumulative %'] = (pareto_data['Count'].cumsum() / pareto_data['Count'].sum()) * 100
-                
                 fig_pareto = go.Figure()
                 fig_pareto.add_trace(go.Bar(x=pareto_data['Category'], y=pareto_data['Count'], name='Count', marker_color='#003F87'))
                 fig_pareto.add_trace(go.Scatter(x=pareto_data['Category'], y=pareto_data['Cumulative %'], name='Cumulative %', yaxis='y2', line=dict(color='#F37021')))
@@ -140,36 +150,31 @@ with tab3:
                 st.plotly_chart(fig_pareto, use_container_width=True)
             else:
                 st.info("No deviations with root cause data available.")
-                
             with st.expander("Methodology: Pareto Analysis"):
                 st.markdown("A Pareto chart follows the 80/20 rule, showing that roughly 80% of problems ('Count') come from 20% of causes ('Category'). **Action:** Focus your continuous improvement efforts on the top 1-2 root causes to achieve the greatest impact on reducing deviations.")
-
         with q_col2:
             st.subheader("Monthly Quality Event Trend")
             trend_data = cdmo_quality.copy()
             trend_data['Month'] = pd.to_datetime(trend_data['Open Date']).dt.to_period('M').astype(str)
-            
             fig_trend = px.histogram(trend_data, x='Month', color='Type', title="Quality Records Opened Over Time", barmode='stack')
             fig_trend.update_layout(height=400)
             st.plotly_chart(fig_trend, use_container_width=True)
-
             with st.expander("Methodology: Trend Analysis"):
                 st.markdown("This chart tracks the number and type of new quality records opened each month. **Action:** A rising trend indicates deteriorating quality performance at the CDMO, while a falling trend shows improvement. Use this to assess the effectiveness of implemented CAPAs and improvement initiatives.")
-
     with st.expander("View/Edit Detailed Quality Log"):
         st.data_editor(cdmo_quality, use_container_width=True, hide_index=True)
-# --- END: Overhauled Quality Systems Tab ---
 
 with tab4:
-    # This tab remains the same as it was already well-structured
-    st.header("Business Continuity & Risk Mitigation") # ... content ...
+    st.header("Business Continuity & Risk Mitigation")
     st.subheader("Business Continuity Plan (BCP)")
-    bcp_status = cdmo_details['BCP Status']; bcp_last_reviewed = cdmo_details['BCP Last Reviewed']
+    bcp_status = cdmo_details['BCP Status']
+    bcp_last_reviewed = cdmo_details['BCP Last Reviewed']
     bcp_col1, bcp_col2 = st.columns(2)
     bcp_col1.metric("BCP Status", bcp_status)
     if pd.notna(bcp_last_reviewed):
         bcp_col2.metric("BCP Last Reviewed", bcp_last_reviewed.strftime('%Y-%m-%d'))
-        if (date.today() - bcp_last_reviewed).days > 365: st.warning("BCP review is overdue.")
+        if (date.today() - bcp_last_reviewed).days > 365:
+            st.warning("BCP review is overdue. Schedule a review with the CDMO.")
     else:
         bcp_col2.metric("BCP Last Reviewed", "N/A")
     st.divider()
